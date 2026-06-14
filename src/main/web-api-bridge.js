@@ -29,6 +29,48 @@
     return q ? '?' + q : '';
   };
 
+  // ==================== Copy to Clipboard ====================
+  // Browsers block navigator.clipboard on HTTP pages, use textarea fallback
+  function safeCopyToClipboard(text) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      textarea.style.pointerEvents = 'none';
+      document.body.appendChild(textarea);
+      textarea.select();
+      textarea.setSelectionRange(0, text.length);
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return Promise.resolve(success);
+    } catch {
+      return Promise.resolve(false);
+    }
+  }
+  
+  // Override the clipboard API for HTTP pages where navigator.clipboard is unavailable
+  // or blocked by browser security policy
+  try {
+    if (!navigator.clipboard) {
+      navigator.clipboard = {};
+    }
+    if (!navigator.clipboard.writeText) {
+      navigator.clipboard.writeText = function(text) {
+        return safeCopyToClipboard(text);
+      };
+    } else {
+      const nativeWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+      navigator.clipboard.writeText = function(text) {
+        return nativeWriteText(text).catch(function() {
+          return safeCopyToClipboard(text);
+        });
+      };
+    }
+  } catch (e) {
+    console.warn('[WebBridge] Failed to override clipboard API', e);
+  }
+
   // SSE event emitter for simulating Electron event subscriptions
   const _listeners = {};
   function emit(event, data) {
@@ -68,9 +110,15 @@
   const storeAPI = {
     get: async (key) => {
       const config = await get('/config');
-      return config ? config[key] : undefined;
+      if (!config) return undefined;
+      return key === 'config' ? config : config[key];
     },
-    set: (key, value) => post('/config', { [key]: value }),
+    set: async (key, value) => {
+      if (key === 'config') {
+        return post('/config', value);
+      }
+      return post('/config', { [key]: value });
+    },
     delete: (key) => post('/config', { [key]: undefined }),
     clearAll: () => post('/config', {}),
     onInitError: (callback) => () => {},
@@ -166,6 +214,7 @@
     onUpdateProgress: (callback) => () => {},
     onUpdateDownloaded: (callback) => () => {},
     onUpdateError: (callback) => () => {},
+    copyToClipboard: (text) => safeCopyToClipboard(text),
   };
 
   const configAPI = {
@@ -258,7 +307,6 @@
     on: (channel, callback) => on(channel, callback),
     send: (channel, ...args) => {},
     invoke: async (channel, ...args) => {
-      // Map common channels to REST API
       if (channel in managementApiInvoke) {
         return managementApiInvoke[channel](...args)
       }

@@ -156,28 +156,11 @@ export class LoadBalancer {
       console.log(`[LoadBalancer] providerSupportsModel extracted: "${model}" -> "${normalizedModel}"`)
     }
     
-    const effectiveModels = fileStoreManager.getEffectiveModels(provider.id)
-    if (effectiveModels.length === 0) {
-      return true
-    }
-
-    const normalizedModelLower = normalizedModel.toLowerCase()
-    const supported = effectiveModels.some(m => {
-      const normalizedSupported = m.displayName.toLowerCase()
-      if (normalizedSupported.endsWith('*')) {
-        return normalizedModelLower.startsWith(normalizedSupported.slice(0, -1))
-      }
-      return normalizedSupported === normalizedModelLower
-    })
-    
-    if (supported) {
-      console.log(`[LoadBalancer] Provider ${provider.name} supports model "${normalizedModel}" (from "${model}") via effective models`)
-      return true
-    }
-
     const config = fileStoreManager.getConfig()
+    const effectiveModels = fileStoreManager.getEffectiveModels(provider.id)
     
-    // Try exact match first
+    // Priority 1: Check global model mappings first
+    // This ensures global mappings like "gpt-*" -> "Qwen3.6" work correctly
     let globalMapping = config.modelMappings[normalizedModel] || config.modelMappings[model]
     
     // If not found, try wildcard matching
@@ -209,6 +192,25 @@ export class LoadBalancer {
         console.log(`[LoadBalancer] Model "${model}" (actualModel: "${actualModel}") supported by ${provider.name}`)
         return true
       }
+    }
+
+    // Priority 2: Check provider-level effective models (only if no global mapping)
+    if (effectiveModels.length === 0) {
+      return true
+    }
+
+    const normalizedModelLower = normalizedModel.toLowerCase()
+    const supported = effectiveModels.some(m => {
+      const normalizedSupported = m.displayName.toLowerCase()
+      if (normalizedSupported.endsWith('*')) {
+        return normalizedModelLower.startsWith(normalizedSupported.slice(0, -1))
+      }
+      return normalizedSupported === normalizedModelLower
+    })
+    
+    if (supported) {
+      console.log(`[LoadBalancer] Provider ${provider.name} supports model "${normalizedModel}" (from "${model}") via effective models`)
+      return true
     }
     
     console.log(`[LoadBalancer] Provider ${provider.name} does not support model ${model}`)
@@ -247,24 +249,19 @@ export class LoadBalancer {
       console.log(`[LoadBalancer] Extracted model name from prefix format: "${model}" -> "${normalizedModel}"`)
     }
     
-    const effectiveModels = fileStoreManager.getEffectiveModels(provider.id)
-    const effectiveModel = effectiveModels.find(m => 
-      m.displayName.toLowerCase() === normalizedModel.toLowerCase()
-    )
-    
-    if (effectiveModel) {
-      console.log(`[LoadBalancer] Model mapped from "${model}" to "${effectiveModel.actualModelId}" via effective models`)
-      return effectiveModel.actualModelId
-    }
-
     const config = fileStoreManager.getConfig()
-    const mapping = config.modelMappings[normalizedModel] || 
-                     this.findWildcardMapping(normalizedModel, config.modelMappings)
-
-    if (mapping && (!mapping.preferredProviderId || mapping.preferredProviderId === provider.id)) {
-      const actualModel = mapping.actualModel
+    const effectiveModels = fileStoreManager.getEffectiveModels(provider.id)
+    
+    // Priority 1: Check global model mappings first (including wildcard patterns)
+    // This allows users to set global mappings like "gpt-*" -> "Qwen3.6" that work across all providers
+    let globalMapping = config.modelMappings[normalizedModel] || 
+                        this.findWildcardMapping(normalizedModel, config.modelMappings)
+    
+    if (globalMapping && (!globalMapping.preferredProviderId || globalMapping.preferredProviderId === provider.id)) {
+      const actualModel = globalMapping.actualModel
       console.log(`[LoadBalancer] Model mapped from "${model}" to "${actualModel}" via global mapping`)
       
+      // Check if the mapped model exists in effective models for further mapping
       const actualEffectiveModel = effectiveModels.find(m => 
         m.displayName.toLowerCase() === actualModel.toLowerCase()
       )
@@ -283,6 +280,16 @@ export class LoadBalancer {
       const actualModel = originalMapping.actualModel
       console.log(`[LoadBalancer] Model mapped from "${model}" to "${actualModel}" via global mapping (original key)`)
       return actualModel
+    }
+
+    // Priority 2: Check provider-level effective models (custom models added by user)
+    const effectiveModel = effectiveModels.find(m => 
+      m.displayName.toLowerCase() === normalizedModel.toLowerCase()
+    )
+    
+    if (effectiveModel) {
+      console.log(`[LoadBalancer] Model mapped from "${model}" to "${effectiveModel.actualModelId}" via effective models`)
+      return effectiveModel.actualModelId
     }
 
     console.log(`[LoadBalancer] No mapping found, returning original model "${model}"`)

@@ -47,16 +47,19 @@
 
 ## 🤖 Supported Providers
 
-| Provider         | Auth Type     | OAuth | Models                                                                          |
-| ---------------- | ------------- | ----- | ------------------------------------------------------------------------------- |
-| DeepSeek         | User Token    | Yes   | DeepSeek-V3.2                                                                   |
-| GLM              | Refresh Token | Yes   | GLM-5                                                                           |
-| Kimi             | JWT Token     | Yes   | kimi-k2.5                                                                       |
-| MiniMax          | JWT Token     | Yes   | MiniMax-M2.5                                                                    |
-| 🆕 Perplexity    | JWT Token     | Yes   | Sonar, Sonar Pro, Sonar Deep Research                                           |
-| Qwen (CN)        | SSO Ticket    | Yes   | Qwen3.5-Plus, Qwen3-Max, Qwen3-Flash, Qwen3-Coder, qwen-max-latest              |
-| Qwen AI (Global) | JWT Token     | Yes   | Qwen3.5-Plus, Qwen3-Max, Qwen3-VL-Plus, Qwen3-Coder-Plus, Qwen-Plus, Qwen-Turbo |
-| Z.ai             | JWT Token     | Yes   | GLM-5, GLM-4.7, GLM-4.6V, GLM-4.6                                               |
+| Provider         | Auth Type     | OAuth | Models                                                                                                                                                                                                                                          |
+| ---------------- | ------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DeepSeek         | User Token    | Yes   | deepseek-v4-flash, deepseek-v4-pro                                                                                                                                                                                                              |
+| GLM              | Refresh Token | Yes   | GLM-5.1                                                                                                                                                                                                                                         |
+| Kimi             | JWT Token     | Yes   | Kimi-K2.6                                                                                                                                                                                                                                       |
+| MiniMax          | JWT Token     | Yes   | MiniMax-M2.7                                                                                                                                                                                                                                    |
+| Mimo             | Cookie        | Yes   | MiMo-V2.5-Pro, MiMo-V2.5, MiMo-V2-Flash                                                                                                                                                                                                         |
+| Perplexity       | Cookie        | Yes   | Auto                                                                                                                                                                                                                                           |
+| Qwen (CN)        | SSO Ticket    | Yes   | Qwen3.6, Qwen3.7-Max, Qwen3.5-Flash, Qwen3-Max, Qwen3-Max-Thinking-Preview, Qwen3-Coder                                                                                                                                                         |
+| Qwen AI (Global) | JWT Token     | Yes   | Qwen3.7-Max, Qwen3.6-Plus, Qwen3.6-35B-A3B, Qwen3.6-27B, Qwen3-Coder                                                                                                                                                                           |
+| Z.ai             | JWT Token     | Yes   | Temporarily unavailable due to frontend captcha risk control                                                                                                                                                                                    |
+
+Provider adaptation notes and manual model-addition guides are in [docs/providers](docs/providers/README.md).
 
 ## 📥 Installation
 
@@ -100,6 +103,29 @@ npm run build:win          # Build for Windows (nsis)
 npm run build:linux        # Build for Linux (AppImage, deb)
 npm run build:all          # Build for all platforms
 ```
+
+### Docker Deploy
+
+**Use pre-built image (no clone required):**
+
+```bash
+mkdir chat2api && cd chat2api
+curl -o docker-compose.yml https://raw.githubusercontent.com/narrator-z/Chat2API/docker/docker-compose.yml
+docker-compose up -d
+```
+
+**Or build locally:**
+
+```bash
+git clone https://github.com/narrator-z/Chat2API.git
+cd Chat2API
+docker-compose -f docker-compose.build.yml up -d --build
+```
+
+- Web UI: http://localhost:3002
+- API Proxy: http://localhost:8088
+
+See [DOCKER.md](DOCKER.md) for full configuration.
 
 ## 📖 Usage
 
@@ -145,7 +171,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="DeepSeek-V3.2",
+    model="deepseek-v4-flash",
     messages=[
         {"role": "user", "content": "Hello, who are you?"}
     ]
@@ -267,4 +293,3 @@ This means:
 - [Tailwind CSS](https://tailwindcss.com/) - CSS framework
 - [Zustand](https://zustand-demo.pmnd.rs/) - State management
 - [Koa](https://koajs.com/) - HTTP server
-

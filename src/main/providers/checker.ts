@@ -398,6 +398,16 @@ export class ProviderChecker {
             const decoded = Buffer.from(payload, 'base64').toString('utf8')
             const data = JSON.parse(decoded)
             realUserID = data.user?.id || data.id || data.sub || ''
+
+            // Check if token is expired based on exp field in JWT
+            if (data.exp) {
+              const currentTime = Math.floor(Date.now() / 1000)
+              if (currentTime >= data.exp) {
+                console.log('[MiniMax] Token has expired based on JWT exp field')
+                return { valid: false, error: 'Token has expired' }
+              }
+            }
+
             console.log('[MiniMax] Extracted userId from token:', realUserID)
           }
         } catch (e) {
@@ -462,7 +472,13 @@ export class ProviderChecker {
       console.log('[MiniMax] Response data:', JSON.stringify(response.data, null, 2))
       
       if (response.status === 200 && response.data?.data?.deviceIDStr) {
-        const userInfo = response.data.data.userInfo
+        // If device registration returns empty userID/realUserID, the JWT is invalid/expired
+        const data = response.data.data
+        if (!data.userID && !data.realUserID) {
+          console.log('[MiniMax] Device register succeeded but returned empty userID - token likely expired')
+          return { valid: false, error: 'Token is invalid or expired (empty user ID)' }
+        }
+        const userInfo = data.userInfo
         return {
           valid: true,
           userInfo: {
@@ -472,7 +488,7 @@ export class ProviderChecker {
         }
       }
       
-      if (response.data?.statusInfo?.code === 1001) {
+      if (response.status === 401 || response.data?.statusInfo?.code === 1001 || response.data?.statusInfo?.code === 1000) {
         return { valid: false, error: 'Token expired or invalid' }
       }
       

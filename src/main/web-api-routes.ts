@@ -209,7 +209,20 @@ router.put('/providers/:id', async (ctx) => {
       return jsonError(ctx, 'Provider not found', 404)
     }
     if (existing.type === 'builtin') {
-      throw new Error('Cannot modify built-in provider')
+      // Only allow updating enabled/disabled status for built-in providers
+      const restricted = ['name', 'authType', 'apiEndpoint', 'type', 'id', 'createdAt']
+      const hasRestricted = Object.keys(updates).some((key) => restricted.includes(key))
+      
+      if (hasRestricted) {
+        throw new Error('Cannot modify built-in provider core configuration')
+      }
+      
+      // Allow safe fields like enabled, updatedAt, etc.
+      const updated = fileStoreManager.updateProvider(id, { ...updates, updatedAt: Date.now() })
+      if (updated) {
+        fileStoreManager.addLog('info', `Updated built-in provider: ${existing.name}`, { providerId: id, updates })
+      }
+      return jsonOk(ctx, updated)
     }
 
     if (updates.name && updates.name !== existing.name) {
